@@ -70,55 +70,61 @@ async def download_package(
 
 
 async def main(argv=None):
-    parser = argparse.ArgumentParser(description="Download GitHub release packages")
-    parser.add_argument("-u", "--user", required=True, help="GitHub user name")
-    parser.add_argument("-r", "--repo", required=True, help="GitHub repo name")
-    parser.add_argument(
-        "-t", "--type", required=True, help="Package type (e.g., tar.gz)"
-    )
-    args = parser.parse_args(argv)
-
-    base_url = f"https://github.com/{args.user}/{args.repo}"
-    pkg_path = os.getcwd()
-    distro = "darwin" if platform.system() == "Darwin" else "linux"
-    arch = platform.machine().lower()
-
-    if arch == "x86_64":
-        arch = "amd64"
-    elif arch == "aarch64":
-        arch = "arm64"
-
-    async with aiohttp.ClientSession() as session:
-        latest = await get_latest_release(base_url, session)
-        if not latest:
-            print("Failed to get latest release version")
-            return
-
-        pkg_urls = await get_package_urls(
-            args.user, args.repo, args.type, latest, session
+    try:
+        parser = argparse.ArgumentParser(description="Download GitHub release packages")
+        parser.add_argument("-u", "--user", required=True, help="GitHub user name")
+        parser.add_argument("-r", "--repo", required=True, help="GitHub repo name")
+        parser.add_argument(
+            "-t", "--type", required=True, help="Package type (e.g., tar.gz)"
         )
-        if not pkg_urls:
-            print(f"No packages found for {args.type}")
-            return
+        args = parser.parse_args(argv)
 
-        filtered_urls = filter_packages(pkg_urls, distro, arch)
+        base_url = f"https://github.com/{args.user}/{args.repo}"
+        pkg_path = os.getcwd()
+        distro = "darwin" if platform.system() == "Darwin" else "linux"
+        arch = platform.machine().lower()
 
-        if len(filtered_urls) > 1:
-            print("Available packages:")
-            for i, url in enumerate(filtered_urls, 1):
-                print(f"{i}: {url}")
-            pkg_num = int(input("Enter package number: ")) - 1
-            pkg_url = filtered_urls[pkg_num]
-        elif filtered_urls:
-            pkg_url = filtered_urls[0]
-        else:
-            print(f"No packages found for {distro}/{arch}")
-            return
+        if arch == "x86_64":
+            arch = "amd64"
+        elif arch == "aarch64":
+            arch = "arm64"
 
-        pkg_name = pkg_url.split("/")[-1]
-        output = os.path.join(pkg_path, pkg_name)
-        await download_package(pkg_url, output, session)
-        print(f"{pkg_name} downloaded to {pkg_path}")
+        async with aiohttp.ClientSession() as session:
+            latest = await get_latest_release(base_url, session)
+            if not latest:
+                print("Failed to get latest release version")
+                return
+
+            pkg_urls = await get_package_urls(
+                args.user, args.repo, args.type, latest, session
+            )
+            if not pkg_urls:
+                print(f"No packages found for {args.type}")
+                return
+
+            filtered_urls = filter_packages(pkg_urls, distro, arch)
+
+            if len(filtered_urls) > 1:
+                print("Available packages:")
+                for i, url in enumerate(filtered_urls, 1):
+                    print(f"{i}: {url}")
+                pkg_num = int(input("Enter package number: ")) - 1
+                pkg_url = filtered_urls[pkg_num]
+            elif filtered_urls:
+                pkg_url = filtered_urls[0]
+            else:
+                print(f"No packages found for {distro}/{arch}")
+                return
+
+            pkg_name = pkg_url.split("/")[-1]
+            output = os.path.join(pkg_path, pkg_name)
+            await download_package(pkg_url, output, session)
+            print(f"{pkg_name} downloaded to {pkg_path}")
+    except KeyboardInterrupt:
+        print("\nDownload cancelled. Exiting...")
+        exit(0)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":
